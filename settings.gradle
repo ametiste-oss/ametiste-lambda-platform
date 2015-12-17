@@ -1,3 +1,4 @@
 rootProject.name = 'ametiste-lambda-platform'
 include 'lambda-platform-pgw'
+include 'lambda-platform-pgw-spring-starter'
 

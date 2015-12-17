@@ -13,7 +13,7 @@ subprojects {
     targetCompatibility = 1.8
 
     group = 'org.ametiste.lambda-platform'
-    version = '0.0.1-b2'
+    version = '0.0.1-b3'
 
     ext {
         slf4jVersion = "1.7.12"

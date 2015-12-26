@@ -1,6 +1,11 @@
 package org.ametiste.laplatform.protocol;
 
-import java.util.function.Consumer;
+import org.ametiste.laplatform.protocol.gateway.SessionOption;
+import org.ametiste.laplatform.protocol.gateway.OptionDescriptor;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 /**
  *
@@ -8,43 +13,16 @@ import java.util.function.Consumer;
  */
 public interface ProtocolGateway {
 
-    <T extends Protocol> T session(Class<T> protocolType);
+    <T extends Protocol> T session(Class<T> protocolType, List<SessionOption> options);
 
-    /**
-     * <p>
-     *      Sync variant of {@link #query(Consumer)} method, that installs given callback to the
-     *      descriptor and blocks until query execution done. Returns consumed field value as raw {@code String}.
-     * </p>
-     *
-     * <p>
-     *     Note, provided QueryDescriptor should be opened, accept callback should not be installed to
-     *     use this method.
-     * </p>
-     *
-     * @param queryConsumer
-     * @param callback
-     *
-     * @see GatewayMappers for details on builtin mappers
-     */
-//    String query(Consumer<QueryDescriptor> queryConsumer, GatewayCallback callback);
+    default <T extends Protocol> T session(Class<T> protocolType) {
+        return session(protocolType, Collections.emptyList());
+    }
 
-    /**
-     * <p>
-     * Sync variant of {@link #query(Consumer)} method, that installs given callback mapper to the
-     * descriptor and blocks until query execution done. Returns consumed value mapped by the given
-     * {@code callbackMapper}.
-     * </p>
-     *
-     * <p>
-     *     Note, provided QueryDescriptor should be opened, accept callback should not be installed to
-     *     use this method.
-     * </p>
-     *
-     * @param queryConsumer
-     * @param callback
-     *
-     * @see GatewayMappers for details on builtin mappers
-     */
-//    <T> T query(Consumer<QueryDescriptor> queryConsumer, GatewayResponseMapper<T> callbackMapper);
+    default <T extends Protocol> T session(Class<T> protocolType, SessionOption... options) {
+        return session(protocolType, Arrays.asList(options));
+    }
+
+    OptionDescriptor sessionOption(Class<?> protocolType, SessionOption option);
 
 }

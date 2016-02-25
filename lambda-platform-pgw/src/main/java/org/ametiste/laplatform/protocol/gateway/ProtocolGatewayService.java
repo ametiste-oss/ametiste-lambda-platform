@@ -18,12 +18,12 @@ public class ProtocolGatewayService {
         this.protocolFactories = protocolFactories;
     }
 
-    public ProtocolGateway createGateway(String clientId) {
+    public ProtocolGateway createGateway(String clientId, Map<String, String> gatewayProperties) {
         // NOTE: PoC implementation, just remap factories
         // in real implementation unique map of protocols will be created for each gateway client call
         // I need to design a ProtocolFamily abstraction for it, gateway will receive family instead of map
         return new DirectProtocolGateway(
-            protocolFactories, new DirectGatewayContext(clientId)
+            protocolFactories, new DirectGatewayContext(clientId, gatewayProperties)
         );
     }
 

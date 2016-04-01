@@ -12,10 +12,30 @@ import java.util.Map;
  */
 public class ProtocolGatewayService {
 
+    public static final class Entry {
+
+        final Class<? extends Protocol> protocolType;
+
+        final ProtocolFactory<? extends Protocol> protocolFactory;
+
+        public Entry(Class<? extends Protocol> protocolType, ProtocolFactory<? extends Protocol> protocolFactory) {
+            this.protocolType = protocolType;
+            this.protocolFactory = protocolFactory;
+        }
+    }
+
     private final Map<Class<? extends Protocol>, ProtocolFactory<?>> protocolFactories;
 
     public ProtocolGatewayService(Map<Class<? extends Protocol>, ProtocolFactory<?>> protocolFactories) {
         this.protocolFactories = protocolFactories;
+    }
+
+    public void registerGatewayFactory(Entry entry) {
+        this.protocolFactories.put(entry.protocolType, entry.protocolFactory);
+    }
+
+    public void registerGatewayFactory(Class<? extends Protocol> protocolType, ProtocolFactory<? extends Protocol> protocolFactory) {
+        registerGatewayFactory(new Entry(protocolType, protocolFactory));
     }
 
     public ProtocolGateway createGateway(String clientId, Map<String, String> gatewayProperties) {

@@ -4,6 +4,8 @@ import org.ametiste.laplatform.protocol.Protocol;
 import org.ametiste.laplatform.protocol.ProtocolFactory;
 import org.ametiste.laplatform.protocol.ProtocolGateway;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -45,6 +47,10 @@ public class ProtocolGatewayService {
         return new DirectProtocolGateway(
             protocolFactories, new DirectGatewayContext(clientId, gatewayProperties)
         );
+    }
+
+    public List<Class<? extends Protocol>> listRegisteredProtocols() {
+        return new ArrayList<>(protocolFactories.keySet());
     }
 
 }

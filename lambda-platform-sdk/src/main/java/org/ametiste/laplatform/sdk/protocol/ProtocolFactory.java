@@ -8,7 +8,7 @@ import net.jodah.typetools.TypeResolver;
  * </p>
  *
  * @param <T> factory of protocol produced by this factory. Note, main reason to have this general factory
- *           is autoconfiguration capabilities, see {@link ProtocolUtils#protocolFactoryPair(ProtocolFactory)}
+ *           is autoconfiguration capabilities, see {@link #protocolFactoryPair(ProtocolFactory)}
  *           for technical details of configuration process.
  *
  * @since 0.1.0
@@ -35,7 +35,7 @@ public interface ProtocolFactory<T extends Protocol> {
 
     /**
      * <p>
-     *     Creates {@link ProtocolUtils.Pair} ({@link Protocol}, {@link ProtocolFactory}) using the given {@code ProtocolFactory}
+     *     Creates {@link ProtocolPair} ({@link Protocol}, {@link ProtocolFactory}) using the given {@code ProtocolFactory}
      *     instance.
      * </p>
      *

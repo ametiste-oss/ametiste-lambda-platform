@@ -1,7 +1,7 @@
 package org.ametiste.laplatform.protocol.gateway;
 
-import org.ametiste.laplatform.protocol.Protocol;
-import org.ametiste.laplatform.protocol.ProtocolFactory;
+import org.ametiste.laplatform.sdk.protocol.Protocol;
+import org.ametiste.laplatform.sdk.protocol.ProtocolFactory;
 import org.ametiste.laplatform.protocol.ProtocolGateway;
 
 import java.util.ArrayList;

@@ -1,8 +1,6 @@
-package org.ametiste.laplatform.protocol;
+package org.ametiste.laplatform.sdk.protocol;
 
 import java.util.Map;
-import java.util.Optional;
-import java.util.function.Consumer;
 
 /**
  *

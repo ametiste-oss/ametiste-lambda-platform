@@ -2,6 +2,7 @@ package org.ametiste.laplatform.protocol;
 
 import org.ametiste.laplatform.protocol.gateway.SessionOption;
 import org.ametiste.laplatform.protocol.gateway.OptionDescriptor;
+import org.ametiste.laplatform.sdk.protocol.Protocol;
 
 import java.util.Arrays;
 import java.util.Collections;

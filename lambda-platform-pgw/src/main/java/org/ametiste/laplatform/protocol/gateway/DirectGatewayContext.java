@@ -1,6 +1,6 @@
 package org.ametiste.laplatform.protocol.gateway;
 
-import org.ametiste.laplatform.protocol.GatewayContext;
+import org.ametiste.laplatform.sdk.protocol.GatewayContext;
 
 import java.util.Collections;
 import java.util.HashMap;

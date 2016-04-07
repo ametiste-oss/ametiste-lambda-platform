@@ -26,4 +26,10 @@ public interface ProtocolGateway {
 
     OptionDescriptor sessionOption(Class<?> protocolType, SessionOption option);
 
+    /**
+     * Releases this gateway instance, must be called by the gateway server after
+     * gateway at the end of gateway cycle.
+     */
+    void release();
+
 }

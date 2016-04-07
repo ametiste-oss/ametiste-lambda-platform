@@ -18,6 +18,8 @@ public class DirectProtocolGateway implements ProtocolGateway {
 
     private final Map<Class<? extends Protocol>, ProtocolFactory<?>> protocols;
 
+    private final Map<Class<? extends Protocol>, Protocol> sessions;
+
     private final Map<Class<? extends Protocol>, SessionStatProxy> sessionProxies;
 
     private final GatewayContext gc;
@@ -25,37 +27,17 @@ public class DirectProtocolGateway implements ProtocolGateway {
     public DirectProtocolGateway(Map<Class<? extends Protocol>, ProtocolFactory<?>> protocols, GatewayContext gc) {
         this.gc = gc;
         this.protocols = protocols;
+        this.sessions = new HashMap<>();
         this.sessionProxies = new HashMap<>();
     }
 
     @Override
     public <T extends Protocol> T session(final Class<T> protocolType, final List<SessionOption> options) {
 
-        if (!protocols.containsKey(protocolType)) {
-            throw new RuntimeException("Gateway has no access to the requested protocol: " + protocolType.getName());
-        }
-
-        final Protocol protocol = protocols
-                .get(protocolType).createProtocol(gc);
-
-        if (!protocolType.isAssignableFrom(protocol.getClass())) {
-            throw new IllegalStateException("Gateway has no access to " +
-                    "protocol of the given type: " + protocolType.getName());
-        }
-
-        Protocol sessionedProtocol = protocol;
-
-        // NOTE: just for start, need to rework it to support custom options
-        if (options.contains(SessionOption.STATS)) {
-            final SessionStatProxy sessionProxy = new SessionStatProxy(sessionedProtocol);
-            sessionedProtocol = newProtocolSession(
-                    sessionedProtocol, sessionProxy, protocolType
-            );
-            sessionProxies.put(protocolType, sessionProxy);
-        }
+        Protocol session = protocolOptions(protocolType, options, protocolSession(protocolType));
 
         try {
-            return protocolType.cast(sessionedProtocol);
+            return protocolType.cast(session);
         } catch (ClassCastException e) {
             throw new IllegalStateException("Gateway has error during access to " +
                     "protocol of the given type: " + protocolType.getName(), e);
@@ -65,7 +47,6 @@ public class DirectProtocolGateway implements ProtocolGateway {
 
     @Override
     public OptionDescriptor sessionOption(final Class<?> protocolType, SessionOption option) {
-
         // NOTE: just for start, need to rework it to support custom options
         if (option.equals(SessionOption.STATS)) {
 
@@ -84,12 +65,49 @@ public class DirectProtocolGateway implements ProtocolGateway {
         }
     }
 
-    public Protocol newProtocolSession(Protocol obj, SessionStatProxy sessionStatProxy, Class<? extends Protocol> protocolType) {
-        return protocolType.cast(java.lang.reflect.Proxy.newProxyInstance(
+    @Override
+    public void release() {
+        sessions.values().forEach(Protocol::disconnect);
+    }
+
+    private <T extends Protocol> Protocol protocolOptions(final Class<T> protocolType, final List<SessionOption> options, Protocol proxiedSession) {
+        // NOTE: just for start, need to rework it to support custom options
+        if (options.contains(SessionOption.STATS)) {
+            final SessionStatProxy sessionProxy = new SessionStatProxy(proxiedSession);
+            proxiedSession = proxySession(
+                    proxiedSession, sessionProxy, protocolType
+            );
+            sessionProxies.put(protocolType, sessionProxy);
+        }
+        return proxiedSession;
+    }
+
+    private <T extends Protocol> Protocol protocolSession(final Class<T> protocolType) {
+
+        if (!protocols.containsKey(protocolType)) {
+            throw new RuntimeException("Gateway has no access to the requested protocol: " + protocolType.getName());
+        }
+
+        final Protocol protocol = protocols.get(protocolType).createProtocol(gc);
+
+        if (!protocolType.isAssignableFrom(protocol.getClass())) {
+            throw new IllegalStateException("Gateway has no access to " +
+                    "protocol of the given type: " + protocolType.getName());
+        }
+
+        protocol.connect();
+        sessions.put(protocolType, protocol);
+
+        return protocol;
+    }
+
+    private Protocol proxySession(Protocol obj, SessionStatProxy sessionStatProxy, Class<? extends Protocol> protocolType) {
+        Protocol session = protocolType.cast(java.lang.reflect.Proxy.newProxyInstance(
                 obj.getClass().getClassLoader(),
                 obj.getClass().getInterfaces(),
                 sessionStatProxy
         ));
+        return session;
     }
 
 }

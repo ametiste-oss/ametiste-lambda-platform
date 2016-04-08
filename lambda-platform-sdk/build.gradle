@@ -1,0 +1,20 @@
+plugins {
+    id "com.jfrog.bintray" version "1.3.1"
+}
+
+description = "L-Platform SDK"
+
+apply from: "https://raw.githubusercontent.com/ametiste-oss/ametiste-bintray-gradle/master/bintray.gradle"
+
+apply plugin: 'java'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+    compile "net.jodah:typetools:0.4.4"
+
+    testCompile group: 'junit', name: 'junit', version: '4.11'
+}

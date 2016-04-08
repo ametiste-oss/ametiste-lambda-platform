@@ -4,9 +4,7 @@ import org.ametiste.laplatform.sdk.protocol.Protocol;
 import org.ametiste.laplatform.sdk.protocol.ProtocolFactory;
 import org.ametiste.laplatform.protocol.ProtocolGateway;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  *
@@ -16,36 +14,84 @@ public class ProtocolGatewayService {
 
     public static final class Entry {
 
-        final Class<? extends Protocol> protocolType;
+        final String name;
 
-        final ProtocolFactory<? extends Protocol> protocolFactory;
+        final String group;
 
-        public Entry(Class<? extends Protocol> protocolType, ProtocolFactory<? extends Protocol> protocolFactory) {
-            this.protocolType = protocolType;
-            this.protocolFactory = protocolFactory;
+        final Class<? extends Protocol> type;
+
+        final Map<String, String> operationsMapping;
+
+        final ProtocolFactory<? extends Protocol> factory;
+
+        final boolean isProduceTimingEvents;
+
+        public Entry(final String name,
+                     final String group,
+                     final Map<String, String> operationsMapping,
+                     final Class<? extends Protocol> type,
+                     final ProtocolFactory<? extends Protocol> factory) {
+            this(name, group, operationsMapping, type, factory, true);
         }
+
+        public Entry(final String name,
+                     final String group,
+                     final Map<String, String> operationsMapping,
+                     final Class<? extends Protocol> type,
+                     final ProtocolFactory<? extends Protocol> factory,
+                     final boolean isProduceTimingEvents) {
+            this.name = name;
+            this.group = group;
+            this.operationsMapping = operationsMapping;
+            this.type = type;
+            this.factory = factory;
+            this.isProduceTimingEvents = isProduceTimingEvents;
+        }
+
     }
 
     private final Map<Class<? extends Protocol>, ProtocolFactory<?>> protocolFactories;
 
+    private final Map<Class<? extends Protocol>, Entry> protocolEntries;
+
     public ProtocolGatewayService(Map<Class<? extends Protocol>, ProtocolFactory<?>> protocolFactories) {
         this.protocolFactories = protocolFactories;
+        this.protocolEntries = new HashMap<>();
+
+        // NOTE: at the moment of 0.2.2, to provide backward compatibility, simple factories
+        // registered as protocols that does not enables STAT option by default.
+        //
+        // It means that these protocols will not produce invocation timing events, so that
+        // gateway servers will not receive and produce metrics for these protocols automaticaly.
+        //
+        // Basically it means, that the old fashion protocols still responsible to define
+        // their own metrics interface.
+
+        this.protocolFactories.forEach((t, f) -> {
+            registerProtocol(new Entry(t.getName(), "legacy-0.1", Collections.emptyMap(), t, f, false));
+        });
     }
 
-    public void registerGatewayFactory(Entry entry) {
-        this.protocolFactories.put(entry.protocolType, entry.protocolFactory);
+    public void registerProtocol(Entry entry) {
+        this.protocolFactories.put(entry.type, entry.factory);
+        this.protocolEntries.put(entry.type, entry);
     }
 
-    public void registerGatewayFactory(Class<? extends Protocol> protocolType, ProtocolFactory<? extends Protocol> protocolFactory) {
-        registerGatewayFactory(new Entry(protocolType, protocolFactory));
+    public void registerProtocol(String protocolName, String protocolGroup,
+                                 Map<String, String> operationsMapping, Class<? extends Protocol> protocolType,
+                                 ProtocolFactory<? extends Protocol> protocolFactory) {
+        registerProtocol(new Entry(protocolName, protocolGroup, operationsMapping, protocolType, protocolFactory));
     }
 
     public ProtocolGateway createGateway(String clientId, Map<String, String> gatewayProperties) {
         // NOTE: PoC implementation, just remap factories
         // in real implementation unique map of protocols will be created for each gateway client call
         // I need to design a ProtocolFamily abstraction for it, gateway will receive family instead of map
+
+        // TODO: I want to store all created gateways somehow.
+
         return new DirectProtocolGateway(
-            protocolFactories, new DirectGatewayContext(clientId, gatewayProperties)
+            protocolEntries, new DirectGatewayContext(clientId, gatewayProperties)
         );
     }
 

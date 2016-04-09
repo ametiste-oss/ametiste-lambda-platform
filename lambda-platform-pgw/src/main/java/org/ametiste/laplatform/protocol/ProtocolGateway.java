@@ -2,7 +2,6 @@ package org.ametiste.laplatform.protocol;
 
 import org.ametiste.laplatform.protocol.gateway.SessionOption;
 import org.ametiste.laplatform.protocol.gateway.OptionDescriptor;
-import org.ametiste.laplatform.protocol.stats.ProtocolStats;
 import org.ametiste.laplatform.sdk.protocol.Protocol;
 
 import java.util.Arrays;
@@ -13,7 +12,7 @@ import java.util.List;
  *
  * @since
  */
-public interface ProtocolGateway extends ProtocolStats {
+public interface ProtocolGateway {
 
     <T extends Protocol> T session(Class<T> protocolType, List<SessionOption> options);
 

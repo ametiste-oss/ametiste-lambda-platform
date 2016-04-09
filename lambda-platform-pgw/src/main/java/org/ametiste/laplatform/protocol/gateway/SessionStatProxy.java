@@ -1,11 +1,10 @@
 package org.ametiste.laplatform.protocol.gateway;
 
+import org.ametiste.laplatform.protocol.stats.InvocationExceptionListener;
 import org.ametiste.laplatform.protocol.stats.InvocationTimeListener;
 
 import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.function.BiConsumer;
 
 /**
  *
@@ -13,18 +12,24 @@ import java.util.function.BiConsumer;
  */
 public class SessionStatProxy implements InvocationHandler {
 
+    private final String client;
     private final Object obj;
     private final ProtocolGatewayService.Entry sessionDescriptor;
-    private final InvocationTimeListener producer;
+    private final InvocationTimeListener timingListener;
+    private final InvocationExceptionListener exceptionListener;
 
     private long lastMessageTimeTaken;
 
-    public SessionStatProxy(final Object obj,
+    public SessionStatProxy(final String client,
+                            final Object obj,
                             final ProtocolGatewayService.Entry sessionDescriptor,
-                            final InvocationTimeListener producer) {
+                            final InvocationTimeListener timingListener,
+                            final InvocationExceptionListener exceptionListener) {
+        this.client = client;
         this.obj = obj;
         this.sessionDescriptor = sessionDescriptor;
-        this.producer = producer;
+        this.timingListener = timingListener;
+        this.exceptionListener = exceptionListener;
     }
 
     public long lastInvocationTimeTaken() {
@@ -33,18 +38,26 @@ public class SessionStatProxy implements InvocationHandler {
 
     @Override
     public Object invoke(final Object proxy, final Method method, final Object[] args) throws Throwable {
-        Object result;
-        final long startTime = System.currentTimeMillis();
-        result = method.invoke(obj, args);
-        final long endTime = System.currentTimeMillis();
-        this.lastMessageTimeTaken = endTime - startTime;
 
-        // TODO: may I have this at gw or service gw?
         final String describedName =
                 sessionDescriptor.operationsMapping.get(method.getName());
 
-        this.producer.acceptTiming(sessionDescriptor.name,
-                sessionDescriptor.group, describedName, lastMessageTimeTaken);
+        final Object result;
+        final long startTime = System.currentTimeMillis();
+
+        try {
+            result = method.invoke(obj, args);
+        } catch (Throwable e) {
+            exceptionListener.handleException(client,
+                    sessionDescriptor.name, sessionDescriptor.group, describedName, e);
+            throw e;
+        } finally {
+            final long endTime = System.currentTimeMillis();
+            this.lastMessageTimeTaken = endTime - startTime;
+
+            timingListener.acceptTiming(client, sessionDescriptor.name,
+                    sessionDescriptor.group, describedName, lastMessageTimeTaken);
+        }
 
         return result;
     }

@@ -4,14 +4,14 @@ package org.ametiste.laplatform.protocol.stats;
  *
  * @since
  */
-public interface InvocationTimeListener {
+public interface InvocationExceptionListener {
 
-    void acceptTiming(
+    void handleException(
             final String client,
             final String group,
             final String protocol,
             final String operation,
-            final long timing
+            final Throwable exception
     );
 
 }

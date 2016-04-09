@@ -1,20 +1,19 @@
 package org.ametiste.laplatform.protocol.gateway;
 
+import org.ametiste.laplatform.protocol.stats.InvocationExceptionListener;
 import org.ametiste.laplatform.protocol.stats.InvocationTimeListener;
-import org.ametiste.laplatform.protocol.stats.ProtocolStats;
+import org.ametiste.laplatform.protocol.stats.ProtocolGatewayInstrumentary;
 import org.ametiste.laplatform.sdk.protocol.GatewayContext;
 import org.ametiste.laplatform.sdk.protocol.Protocol;
-import org.ametiste.laplatform.sdk.protocol.ProtocolFactory;
 import org.ametiste.laplatform.protocol.ProtocolGateway;
 
 import java.util.*;
-import java.util.function.BiConsumer;
 
 /**
  *
  * @since
  */
-public class DirectProtocolGateway implements ProtocolGateway {
+public class DirectProtocolGateway implements ProtocolGateway, ProtocolGatewayInstrumentary {
 
     private final Map<Class<? extends Protocol>, ProtocolGatewayService.Entry> protocols;
 
@@ -24,14 +23,19 @@ public class DirectProtocolGateway implements ProtocolGateway {
 
     private final List<InvocationTimeListener> invocationTimeListeners;
 
+    private final List<InvocationExceptionListener> invocationExceptionListeners;
+
+    private final String client;
     private final GatewayContext gc;
 
-    public DirectProtocolGateway(Map<Class<? extends Protocol>, ProtocolGatewayService.Entry> protocols, GatewayContext gc) {
+    public DirectProtocolGateway(String client, Map<Class<? extends Protocol>, ProtocolGatewayService.Entry> protocols, GatewayContext gc) {
+        this.client = client;
         this.gc = gc;
         this.protocols = protocols;
         this.sessions = new HashMap<>(5);
         this.sessionProxies = new HashMap<>(2);
         this.invocationTimeListeners = new ArrayList<>(5);
+        this.invocationExceptionListeners = new ArrayList<>(5);
     }
 
     @Override
@@ -73,8 +77,13 @@ public class DirectProtocolGateway implements ProtocolGateway {
     }
 
     @Override
-    public void onInvocationTiming(InvocationTimeListener listener) {
-        invocationTimeListeners.add(listener::acceptTiming);
+    public void listenErrors(final InvocationExceptionListener listener) {
+        invocationExceptionListeners.add(listener);
+    }
+
+    @Override
+    public void listenInvocationsTiming(InvocationTimeListener listener) {
+        invocationTimeListeners.add(listener);
     }
 
     private <T extends Protocol> T protocolOptions(final Class<T> protocolType, final List<SessionOption> options, Protocol proxiedSession) {
@@ -91,13 +100,24 @@ public class DirectProtocolGateway implements ProtocolGateway {
             final SessionStatProxy proxyObject;
 
             if(isWantToProduce) {
-                proxyObject = new SessionStatProxy(proxiedSession, entry, this::notifyInvocTimingListeners);
+                proxyObject = new SessionStatProxy(
+                        client,
+                        proxiedSession,
+                        entry,
+                        this::notifyInvocTimingListeners,
+                        this::notifyInvocExceptionListeners
+                );
             } else {
                 // NOTE: just to support the clients that uses legacy protocol creation model
                 // NOTE: this proxy have empty producer passed, so it will not produce any event
                 // NOTE: so the server will no aggregate metrics, etc.
                 // NOTE: it will be removed after refactoring
-                proxyObject = new SessionStatProxy(proxiedSession, entry, (n, g, o, t) -> {});
+                proxyObject = new SessionStatProxy(
+                        client,
+                        proxiedSession,
+                        entry,
+                        (c, n, g, o, t) -> {},
+                        (c, n, g, o, e) -> {});
             }
 
             proxiedSession = proxySession(proxiedSession, proxyObject, protocolType);
@@ -139,12 +159,23 @@ public class DirectProtocolGateway implements ProtocolGateway {
         return session;
     }
 
-    private void notifyInvocTimingListeners(final String name,
+    private void notifyInvocExceptionListeners(final String client,
+                                            final String name,
+                                            final String group,
+                                            final String operation,
+                                            final Throwable exception) {
+        invocationExceptionListeners.forEach(
+                c -> c.handleException(client, name, group, operation, exception)
+        );
+    }
+
+    private void notifyInvocTimingListeners(final String client,
+                                            final String name,
                                             final String group,
                                             final String operation,
                                             final long timing) {
         invocationTimeListeners.forEach(
-                c -> c.acceptTiming(name, group, operation, timing)
+                c -> c.acceptTiming(client, name, group, operation, timing)
         );
     }
 

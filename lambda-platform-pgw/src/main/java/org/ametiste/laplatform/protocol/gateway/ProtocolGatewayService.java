@@ -50,11 +50,14 @@ public class ProtocolGatewayService {
 
     }
 
+    private final List<ProtocolGatewayTool> gatewayTools;
     private final Map<Class<? extends Protocol>, ProtocolFactory<?>> protocolFactories;
 
     private final Map<Class<? extends Protocol>, Entry> protocolEntries;
 
-    public ProtocolGatewayService(Map<Class<? extends Protocol>, ProtocolFactory<?>> protocolFactories) {
+    public ProtocolGatewayService(List<ProtocolGatewayTool> gatewayTools,
+                                  Map<Class<? extends Protocol>, ProtocolFactory<?>> protocolFactories) {
+        this.gatewayTools = gatewayTools;
         this.protocolFactories = protocolFactories;
         this.protocolEntries = new HashMap<>();
 
@@ -90,9 +93,15 @@ public class ProtocolGatewayService {
 
         // TODO: I want to store all created gateways somehow.
 
-        return new DirectProtocolGateway(
-            protocolEntries, new DirectGatewayContext(clientId, gatewayProperties)
+        final DirectProtocolGateway protocolGateway = new DirectProtocolGateway(
+                clientId, protocolEntries, new DirectGatewayContext(clientId, gatewayProperties)
         );
+
+        gatewayTools.forEach(
+            tool -> tool.apply(protocolGateway)
+        );
+
+        return protocolGateway;
     }
 
     public List<Class<? extends Protocol>> listRegisteredProtocols() {

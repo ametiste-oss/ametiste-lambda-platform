@@ -90,8 +90,8 @@ public class DirectProtocolGateway implements ProtocolGateway, ProtocolGatewayIn
 
         final ProtocolGatewayService.Entry entry = resolveEntry(protocolType);
 
-        // NOTE: see ProtocolGatewayService constructor for details on entry.isProduceTimingEvents usage
-        final boolean isWantToProduce = ((!invocationTimeListeners.isEmpty()) && entry.isProduceTimingEvents);
+        // NOTE: see ProtocolGatewayService constructor for details on entry.isProduceEvents usage
+        final boolean isWantToProduce = ((!invocationTimeListeners.isEmpty()) && entry.isProduceEvents);
 
         // NOTE: just for start, need to rework it to support custom options
         if (isWantToProduce || options.contains(SessionOption.STATS)) {

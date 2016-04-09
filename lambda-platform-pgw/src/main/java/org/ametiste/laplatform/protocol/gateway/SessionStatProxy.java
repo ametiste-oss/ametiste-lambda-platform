@@ -1,7 +1,7 @@
 package org.ametiste.laplatform.protocol.gateway;
 
-import org.ametiste.laplatform.protocol.stats.InvocationExceptionListener;
-import org.ametiste.laplatform.protocol.stats.InvocationTimeListener;
+import org.ametiste.laplatform.protocol.tools.InvocationExceptionListener;
+import org.ametiste.laplatform.protocol.tools.InvocationTimeListener;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;

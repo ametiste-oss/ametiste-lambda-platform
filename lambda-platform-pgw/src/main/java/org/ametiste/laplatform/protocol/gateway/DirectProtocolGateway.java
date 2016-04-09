@@ -1,13 +1,14 @@
 package org.ametiste.laplatform.protocol.gateway;
 
-import org.ametiste.laplatform.protocol.stats.InvocationExceptionListener;
-import org.ametiste.laplatform.protocol.stats.InvocationTimeListener;
-import org.ametiste.laplatform.protocol.stats.ProtocolGatewayInstrumentary;
+import org.ametiste.laplatform.protocol.tools.*;
 import org.ametiste.laplatform.sdk.protocol.GatewayContext;
 import org.ametiste.laplatform.sdk.protocol.Protocol;
 import org.ametiste.laplatform.protocol.ProtocolGateway;
 
 import java.util.*;
+import java.util.stream.Collectors;
+
+import static javafx.scene.input.KeyCode.T;
 
 /**
  *
@@ -18,24 +19,32 @@ public class DirectProtocolGateway implements ProtocolGateway, ProtocolGatewayIn
     private final Map<Class<? extends Protocol>, ProtocolGatewayService.Entry> protocols;
 
     private final Map<Class<? extends Protocol>, Protocol> sessions;
+    private final Map<Class<? extends Protocol>, ProtocolGatewayService.Entry> sessionEntries;
 
     private final Map<Class<? extends Protocol>, SessionStatProxy> sessionProxies;
 
     private final List<InvocationTimeListener> invocationTimeListeners;
-
     private final List<InvocationExceptionListener> invocationExceptionListeners;
+    private final List<ProtocolConnectionListener> protocolConnectionListeners;
+    private final List<ProtocolDisconnectedListener> protocolDisconnectedListenerList;
 
     private final String client;
     private final GatewayContext gc;
 
-    public DirectProtocolGateway(String client, Map<Class<? extends Protocol>, ProtocolGatewayService.Entry> protocols, GatewayContext gc) {
+    public DirectProtocolGateway(String client,
+                                 Map<Class<? extends Protocol>,
+                                 ProtocolGatewayService.Entry> protocols,
+                                 GatewayContext gc) {
         this.client = client;
         this.gc = gc;
         this.protocols = protocols;
         this.sessions = new HashMap<>(5);
         this.sessionProxies = new HashMap<>(2);
+        this.sessionEntries = new HashMap<>(5);
         this.invocationTimeListeners = new ArrayList<>(5);
         this.invocationExceptionListeners = new ArrayList<>(5);
+        this.protocolConnectionListeners = new ArrayList<>(5);
+        this.protocolDisconnectedListenerList = new ArrayList<>(5);
     }
 
     @Override
@@ -73,7 +82,22 @@ public class DirectProtocolGateway implements ProtocolGateway, ProtocolGatewayIn
 
     @Override
     public void release() {
-        sessions.values().forEach(Protocol::disconnect);
+
+        final List<Throwable> disconnectErrors = sessions.values().stream()
+                .map(this::disconnectSafe)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(Collectors.toList());
+
+        sessionEntries.forEach(
+            (p, e) -> notifyProtocolDisconnectListeners(p, sessions.get(p), e.group, e.name)
+        );
+
+        if (!disconnectErrors.isEmpty()) {
+            // TODO: add log entriy with all exception listing
+            throw new RuntimeException("Disconnection errors. See error log for details.");
+        }
+
     }
 
     @Override
@@ -84,6 +108,16 @@ public class DirectProtocolGateway implements ProtocolGateway, ProtocolGatewayIn
     @Override
     public void listenInvocationsTiming(InvocationTimeListener listener) {
         invocationTimeListeners.add(listener);
+    }
+
+    @Override
+    public void listenProtocolConnection(ProtocolConnectionListener listener) {
+        protocolConnectionListeners.add(listener);
+    }
+
+    @Override
+    public void listenProtocolDisconnected(ProtocolDisconnectedListener listener) {
+        protocolDisconnectedListenerList.add(listener);
     }
 
     private <T extends Protocol> T protocolOptions(final Class<T> protocolType, final List<SessionOption> options, Protocol proxiedSession) {
@@ -133,7 +167,8 @@ public class DirectProtocolGateway implements ProtocolGateway, ProtocolGatewayIn
             throw new RuntimeException("Gateway has no access to the requested protocol: " + protocolType.getName());
         }
 
-        final Protocol protocol = resolveEntry(protocolType).factory.createProtocol(gc);
+        final ProtocolGatewayService.Entry entry = resolveEntry(protocolType);
+        final Protocol protocol = entry.factory.createProtocol(gc);
 
         if (!protocolType.isAssignableFrom(protocol.getClass())) {
             throw new IllegalStateException("Gateway has no access to " +
@@ -142,6 +177,9 @@ public class DirectProtocolGateway implements ProtocolGateway, ProtocolGatewayIn
 
         protocol.connect();
         sessions.put(protocolType, protocol);
+        sessionEntries.put(protocolType, entry);
+
+        notifyProtocolConnectionListeners(protocolType, protocol, entry.name, entry.group);
 
         return protocolType.cast(protocol);
     }
@@ -159,14 +197,42 @@ public class DirectProtocolGateway implements ProtocolGateway, ProtocolGatewayIn
         return session;
     }
 
-    private void notifyInvocExceptionListeners(final String client,
-                                            final String name,
-                                            final String group,
-                                            final String operation,
-                                            final Throwable exception) {
-        invocationExceptionListeners.forEach(
-                c -> c.handleException(client, name, group, operation, exception)
+    private void notifyProtocolConnectionListeners(final Class<? extends Protocol> protocolType,
+                                                   final Protocol protocol,
+                                                   final String name,
+                                                   final String group) {
+        protocolConnectionListeners.forEach(l ->
+            invokeSafe(() -> l.onProtocolConnection(protocolType, protocol, name, group))
         );
+    }
+
+    private void notifyProtocolDisconnectListeners(final Class<? extends Protocol> protocolType,
+                                                   final Protocol protocol,
+                                                   final String name,
+                                                   final String group) {
+        protocolDisconnectedListenerList.forEach(l ->
+            invokeSafe(() -> l.onProtocolDisconnected(protocolType, protocol, group, name))
+        );
+    }
+
+    private void notifyInvocExceptionListeners(final String client,
+                                               final String name,
+                                               final String group,
+                                               final String operation,
+                                               final Throwable exception) {
+        invocationExceptionListeners.forEach(c ->
+            invokeSafe(() -> c.handleException(client, name, group, operation, exception))
+        );
+    }
+
+    private Optional<Throwable> disconnectSafe(Protocol protocol) {
+        try {
+            protocol.disconnect();
+        } catch (Throwable e) {
+            return  Optional.of(e);
+            // NOTE: just ignore all exceptions on protocol disconnect and return exception if any
+        }
+        return Optional.empty();
     }
 
     private void notifyInvocTimingListeners(final String client,
@@ -174,9 +240,17 @@ public class DirectProtocolGateway implements ProtocolGateway, ProtocolGatewayIn
                                             final String group,
                                             final String operation,
                                             final long timing) {
-        invocationTimeListeners.forEach(
-                c -> c.acceptTiming(client, name, group, operation, timing)
+        invocationTimeListeners.forEach(c ->
+            invokeSafe(() -> c.acceptTiming(client, name, group, operation, timing))
         );
+    }
+
+    private void invokeSafe(Runnable runnable) {
+        try {
+            runnable.run();
+        } catch (Throwable e) {
+            // TODO: add errors log
+        }
     }
 
 }

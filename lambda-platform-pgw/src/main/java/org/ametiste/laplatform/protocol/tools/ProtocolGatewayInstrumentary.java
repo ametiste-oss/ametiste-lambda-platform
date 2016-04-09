@@ -1,6 +1,4 @@
-package org.ametiste.laplatform.protocol.stats;
-
-import java.util.function.BiConsumer;
+package org.ametiste.laplatform.protocol.tools;
 
 /**
  *
@@ -11,5 +9,9 @@ public interface ProtocolGatewayInstrumentary {
     void listenErrors(InvocationExceptionListener listener);
 
     void listenInvocationsTiming(InvocationTimeListener listener);
+
+    void listenProtocolConnection(ProtocolConnectionListener listener);
+
+    void listenProtocolDisconnected(ProtocolDisconnectedListener listener);
 
 }

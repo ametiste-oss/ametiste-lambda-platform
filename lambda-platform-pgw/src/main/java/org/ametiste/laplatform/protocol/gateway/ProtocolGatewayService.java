@@ -1,5 +1,6 @@
 package org.ametiste.laplatform.protocol.gateway;
 
+import org.ametiste.laplatform.protocol.tools.ProtocolGatewayTool;
 import org.ametiste.laplatform.sdk.protocol.Protocol;
 import org.ametiste.laplatform.sdk.protocol.ProtocolFactory;
 import org.ametiste.laplatform.protocol.ProtocolGateway;
@@ -14,17 +15,17 @@ public class ProtocolGatewayService {
 
     public static final class Entry {
 
-        final String name;
+        public final String name;
 
-        final String group;
+        public final String group;
 
-        final Class<? extends Protocol> type;
+        public final Class<? extends Protocol> type;
 
-        final Map<String, String> operationsMapping;
+        public final Map<String, String> operationsMapping;
 
-        final ProtocolFactory<? extends Protocol> factory;
+        public final ProtocolFactory<? extends Protocol> factory;
 
-        final boolean isProduceEvents;
+        public final boolean isProduceEvents;
 
         public Entry(final String name,
                      final String group,
@@ -42,7 +43,7 @@ public class ProtocolGatewayService {
                      final boolean isProduceEvents) {
             this.name = name;
             this.group = group;
-            this.operationsMapping = operationsMapping;
+            this.operationsMapping = Collections.unmodifiableMap(new HashMap<>(operationsMapping));
             this.type = type;
             this.factory = factory;
             this.isProduceEvents = isProduceEvents;
@@ -123,8 +124,8 @@ public class ProtocolGatewayService {
         return createGateway(clientId, gatewayProperties, Collections.emptyList());
     }
 
-    public List<Class<? extends Protocol>> listRegisteredProtocols() {
-        return new ArrayList<>(protocolFactories.keySet());
+    public List<Entry> listRegisteredProtocols() {
+        return new ArrayList<>(protocolEntries.values());
     }
 
 }

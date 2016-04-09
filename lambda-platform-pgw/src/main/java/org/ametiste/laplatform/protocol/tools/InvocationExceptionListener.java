@@ -1,4 +1,4 @@
-package org.ametiste.laplatform.protocol.stats;
+package org.ametiste.laplatform.protocol.tools;
 
 /**
  *

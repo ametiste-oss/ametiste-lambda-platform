@@ -1,6 +1,6 @@
 package org.ametiste.laplatform.protocol.configuration;
 
-import org.ametiste.laplatform.protocol.gateway.ProtocolGatewayTool;
+import org.ametiste.laplatform.protocol.tools.ProtocolGatewayTool;
 import org.ametiste.laplatform.sdk.protocol.Protocol;
 import org.ametiste.laplatform.sdk.protocol.ProtocolFactory;
 import org.ametiste.laplatform.protocol.gateway.ProtocolGatewayService;

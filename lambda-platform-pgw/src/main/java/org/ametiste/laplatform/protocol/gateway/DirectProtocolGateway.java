@@ -8,20 +8,21 @@ import org.ametiste.laplatform.protocol.ProtocolGateway;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static javafx.scene.input.KeyCode.T;
-
 /**
  *
  * @since
  */
 public class DirectProtocolGateway implements ProtocolGateway, ProtocolGatewayInstrumentary {
 
+    // NOTE: please use Entry.type as keys for these maps, dont trust in a method incoming types!
     private final Map<Class<? extends Protocol>, ProtocolGatewayService.Entry> protocols;
-
     private final Map<Class<? extends Protocol>, Protocol> sessions;
-    private final Map<Class<? extends Protocol>, ProtocolGatewayService.Entry> sessionEntries;
-
     private final Map<Class<? extends Protocol>, SessionStatProxy> sessionProxies;
+
+    // NOTE: this map is the place where incoming type is mapped to internal registered type,
+    // if this map does not contain entry for the given protocol type - the protocol type is
+    // unregistered under this gateway
+    private final Map<Class<? extends Protocol>, ProtocolGatewayService.Entry> sessionEntries;
 
     private final List<InvocationTimeListener> invocationTimeListeners;
     private final List<InvocationExceptionListener> invocationExceptionListeners;
@@ -29,14 +30,14 @@ public class DirectProtocolGateway implements ProtocolGateway, ProtocolGatewayIn
     private final List<ProtocolDisconnectedListener> protocolDisconnectedListenerList;
 
     private final String client;
-    private final GatewayContext gc;
+    private final GatewayContext gatewayContext;
 
     public DirectProtocolGateway(String client,
                                  Map<Class<? extends Protocol>,
                                  ProtocolGatewayService.Entry> protocols,
-                                 GatewayContext gc) {
+                                 GatewayContext gatewayContext) {
         this.client = client;
-        this.gc = gc;
+        this.gatewayContext = gatewayContext;
         this.protocols = protocols;
         this.sessions = new HashMap<>(5);
         this.sessionProxies = new HashMap<>(2);
@@ -50,7 +51,7 @@ public class DirectProtocolGateway implements ProtocolGateway, ProtocolGatewayIn
     @Override
     public <T extends Protocol> T session(final Class<T> protocolType, final List<SessionOption> options) {
 
-        T session = protocolOptions(protocolType, options, protocolSession(protocolType));
+        T session = protocolOptions(protocolType, options, resolveProtocolSession(protocolType));
 
         try {
             return session;
@@ -90,7 +91,7 @@ public class DirectProtocolGateway implements ProtocolGateway, ProtocolGatewayIn
                 .collect(Collectors.toList());
 
         sessionEntries.forEach(
-            (p, e) -> notifyProtocolDisconnectListeners(p, sessions.get(p), e.group, e.name)
+            (p, e) -> notifyProtocolDisconnectListeners(e.type, sessions.get(p), e.group, e.name)
         );
 
         if (!disconnectErrors.isEmpty()) {
@@ -161,25 +162,31 @@ public class DirectProtocolGateway implements ProtocolGateway, ProtocolGatewayIn
         return protocolType.cast(proxiedSession);
     }
 
-    private <T extends Protocol> T protocolSession(final Class<T> protocolType) {
+    private <T extends Protocol> T resolveProtocolSession(final Class<T> protocolType) {
 
         if (!protocols.containsKey(protocolType)) {
             throw new RuntimeException("Gateway has no access to the requested protocol: " + protocolType.getName());
         }
 
-        final ProtocolGatewayService.Entry entry = resolveEntry(protocolType);
-        final Protocol protocol = entry.factory.createProtocol(gc);
-
-        if (!protocolType.isAssignableFrom(protocol.getClass())) {
-            throw new IllegalStateException("Gateway has no access to " +
-                    "protocol of the given type: " + protocolType.getName());
+        // NOTE: just use existent session, if any
+        if (sessions.containsKey(protocolType)) {
+            return protocolType.cast(sessions.get(protocolType));
         }
 
-        protocol.connect();
-        sessions.put(protocolType, protocol);
-        sessionEntries.put(protocolType, entry);
+        final ProtocolGatewayService.Entry entry = resolveEntry(protocolType);
+        final Protocol protocol = entry.factory.createProtocol(gatewayContext);
 
-        notifyProtocolConnectionListeners(protocolType, protocol, entry.name, entry.group);
+        if (!protocolType.isAssignableFrom(protocol.getClass())) {
+            throw new IllegalStateException("Protocol type mismatch, expected: " + protocolType.getName()
+                    + " but the gateway has registered type for this protocol: " + protocol.getClass()
+                    + " that does not match registered protocol interface.");
+        }
+
+        sessions.put(entry.type, protocol);
+        sessionEntries.put(entry.type, entry);
+
+        protocol.connect();
+        notifyProtocolConnectionListeners(entry.type, protocol, entry.name, entry.group);
 
         return protocolType.cast(protocol);
     }

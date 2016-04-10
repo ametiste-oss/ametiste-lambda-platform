@@ -72,7 +72,9 @@ public class ProtocolGatewayService {
         // their own metrics interface.
 
         this.protocolFactories.forEach((t, f) -> {
-            registerProtocol(new Entry(t.getName(), "legacy-0.1", Collections.emptyMap(), t, f, false));
+            registerProtocol(new Entry(splitCamelCase(t.getSimpleName()),
+                    "legacy-0.1", Collections.emptyMap(), t, f, false)
+            );
         });
     }
 
@@ -126,6 +128,14 @@ public class ProtocolGatewayService {
 
     public List<Entry> listRegisteredProtocols() {
         return new ArrayList<>(protocolEntries.values());
+    }
+
+    // TODO: move to ame-lang project
+    private static String splitCamelCase(String s) {
+        String regex = "([a-z])([A-Z]+)";
+        String replacement = "$1-$2";
+        return s.replaceAll(regex, replacement)
+                .toLowerCase();
     }
 
 }

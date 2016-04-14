@@ -1,11 +1,13 @@
 package org.ametiste.laplatform.protocol.gateway;
 
+import org.ametiste.laplatform.protocol.ProtocolGateway;
 import org.ametiste.laplatform.protocol.tools.ProtocolGatewayTool;
 import org.ametiste.laplatform.sdk.protocol.Protocol;
 import org.ametiste.laplatform.sdk.protocol.ProtocolFactory;
-import org.ametiste.laplatform.protocol.ProtocolGateway;
 
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  *
@@ -103,11 +105,13 @@ public class ProtocolGatewayService {
         );
 
         // NOTE: at the moment there is no way to define meta data mapping for additional protocols,
-        // such operation names, so these protocols registered as protocols that not produce any events
-        additionalProtocols.forEach(
-            factory -> effectiveEntries.put(
-                factory.protocolType(),
-                new Entry(factory.getClass().getName(), "runtime", Collections.emptyMap(), factory.protocolType(), factory, false)
+        // such operation names, so these protocols registered with generated names only
+        // TODO: add protocol metadata somehow
+        additionalProtocols.forEach(factory ->
+            effectiveEntries.put(factory.protocolType(),
+                new Entry(splitCamelCase(factory.protocolType().getSimpleName()), "mods.runtime.protocol",
+                    resolveOperationsMapping(factory.protocolType()), factory.protocolType(),
+                    factory, true)
             )
         );
 
@@ -116,7 +120,7 @@ public class ProtocolGatewayService {
         );
 
         gatewayTools.forEach(
-                tool -> tool.apply(protocolGateway)
+            tool -> tool.apply(protocolGateway)
         );
 
         return protocolGateway;
@@ -130,7 +134,15 @@ public class ProtocolGatewayService {
         return new ArrayList<>(protocolEntries.values());
     }
 
+    // TODO: replace with the same methods from DSL, after extraction
+    private static Map<String, String> resolveOperationsMapping(Class<?> protocolClass) {
+        return Stream.of(protocolClass.getDeclaredMethods())
+            .map(m -> new String[] { m.getName(), splitCamelCase(m.getName()) })
+            .collect(Collectors.toMap(k -> k[0], k -> k[1]));
+    }
+
     // TODO: move to ame-lang project
+    // TODO: replace with the same methods from DSL, after extraction
     private static String splitCamelCase(String s) {
         String regex = "([a-z])([A-Z]+)";
         String replacement = "$1-$2";
